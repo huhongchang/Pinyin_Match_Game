@@ -1,0 +1,33 @@
+<svg width="1600" height="1200" viewBox="0 0 1600 1200" xmlns="http://www.w3.org/2000/svg" fill="none">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#EAF6FF"/>
+      <stop offset="1" stop-color="#FFF6E8"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1320 220) rotate(90) scale(220)">
+      <stop stop-color="#FFE599"/>
+      <stop offset="1" stop-color="#FFE599" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1600" height="1200" fill="url(#sky)"/>
+  <circle cx="1320" cy="220" r="220" fill="url(#sun)"/>
+
+  <g opacity="0.42">
+    <ellipse cx="280" cy="250" rx="180" ry="56" fill="#FFFFFF"/>
+    <ellipse cx="450" cy="260" rx="150" ry="48" fill="#FFFFFF"/>
+    <ellipse cx="1100" cy="180" rx="170" ry="52" fill="#FFFFFF"/>
+    <ellipse cx="1260" cy="190" rx="130" ry="42" fill="#FFFFFF"/>
+  </g>
+
+  <path d="M0 920C190 820 360 810 560 900C760 990 980 980 1200 890C1380 820 1480 820 1600 860V1200H0V920Z" fill="#DDF1FF"/>
+  <path d="M0 980C220 900 390 900 590 980C800 1060 1000 1050 1210 980C1370 930 1490 930 1600 960V1200H0V980Z" fill="#CDE9FF"/>
+  <path d="M0 1060C220 1010 410 1030 620 1110C840 1190 1040 1180 1270 1110C1420 1070 1510 1070 1600 1090V1200H0V1060Z" fill="#BDE2FF"/>
+
+  <g opacity="0.2">
+    <circle cx="160" cy="110" r="4" fill="#4A8FFF"/>
+    <circle cx="220" cy="90" r="3" fill="#FF8F3D"/>
+    <circle cx="970" cy="120" r="4" fill="#4A8FFF"/>
+    <circle cx="1020" cy="140" r="3" fill="#FF8F3D"/>
+  </g>
+</svg>
