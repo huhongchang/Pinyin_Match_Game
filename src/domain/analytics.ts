@@ -6,8 +6,8 @@ const DEVICE_KEY = 'usage_device_id_v1';
 const SESSION_KEY = 'usage_session_v1';
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
 const MAX_EVENTS = 6000;
-const ANALYTICS_INGEST_API = '/api/analytics/ingest';
-const ANALYTICS_REPORT_API = '/api/analytics/report';
+const ANALYTICS_INGEST_API = '/.netlify/functions/analytics-ingest';
+const ANALYTICS_REPORT_API = '/.netlify/functions/analytics-report';
 const REMOTE_BATCH_SIZE = 20;
 
 let pendingRemoteQueue: AnalyticsEvent[] = [];
