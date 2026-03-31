@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, watchEffect } from 'vue';
+import { computed, watch, watchEffect } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { GRADE_META } from '@/data/books';
+import { trackEvent } from '@/domain/analytics';
 import { getGradeTotalLevels, getSubjectMeta, isValidSubject } from '@/domain/game';
 import { getCompletedCount } from '@/domain/progress';
 import { useProgressStore } from '@/stores/progress';
@@ -21,6 +22,19 @@ watchEffect(() => {
     router.replace('/');
   }
 });
+
+watch(
+  () => route.fullPath,
+  () => {
+    if (!subjectId.value) {
+      return;
+    }
+    trackEvent('subject_enter', {
+      subjectId: subjectId.value
+    });
+  },
+  { immediate: true }
+);
 
 const subjectMeta = computed(() => {
   if (!subjectId.value) {

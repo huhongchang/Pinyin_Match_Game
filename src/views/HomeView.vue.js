@@ -1,6 +1,7 @@
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { SUBJECT_META } from '@/data/books';
+import { trackEvent } from '@/domain/analytics';
 import { getSubjectTotalLevels } from '@/domain/game';
 import { getSubjectCompletedCount } from '@/domain/progress';
 import { useProgressStore } from '@/stores/progress';
@@ -20,9 +21,13 @@ const subjectCards = computed(() => {
     });
 });
 function openSubject(subjectId) {
+    trackEvent('subject_enter', { subjectId });
     const nextGrade = progressStore.progress.currentSubject === subjectId ? progressStore.progress.currentGrade : '一年级上册';
     progressStore.setCurrentPosition(subjectId, nextGrade, 1, 1);
     router.push(`/grade/${subjectId}`);
+}
+function openAdmin() {
+    router.push('/admin/login');
 }
 const __VLS_ctx = {
     ...{},
@@ -114,7 +119,13 @@ __VLS_asFunctionalElement1(__VLS_intrinsics.footer, __VLS_intrinsics.footer)({
 /** @type {__VLS_StyleScopedClasses['footer-note']} */ ;
 __VLS_asFunctionalElement1(__VLS_intrinsics.p, __VLS_intrinsics.p)({});
 __VLS_asFunctionalElement1(__VLS_intrinsics.p, __VLS_intrinsics.p)({});
+__VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
+    ...{ onClick: (__VLS_ctx.openAdmin) },
+    ...{ class: "btn admin-entry-btn" },
+});
+/** @type {__VLS_StyleScopedClasses['btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['admin-entry-btn']} */ ;
 // @ts-ignore
-[];
+[openAdmin,];
 const __VLS_export = (await import('vue')).defineComponent({});
 export default {};

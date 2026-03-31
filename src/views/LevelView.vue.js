@@ -1,5 +1,6 @@
-import { computed, watchEffect } from 'vue';
+import { computed, watch, watchEffect } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { trackEvent } from '@/domain/analytics';
 import { getGlobalLevelNumber, getSubjectMeta, getUnitLevelCount, isValidGrade, isValidSubject } from '@/domain/game';
 import { getLevelStat, isLevelCompleted, isLevelUnlocked } from '@/domain/progress';
 import { formatReadableTime } from '@/domain/game';
@@ -32,6 +33,16 @@ watchEffect(() => {
         router.replace(`/unit/${subjectId.value}/${gradeId.value}`);
     }
 });
+watch(() => route.fullPath, () => {
+    if (!subjectId.value || !gradeId.value || Number.isNaN(unit.value) || unit.value <= 0) {
+        return;
+    }
+    trackEvent('level_enter', {
+        subjectId: subjectId.value,
+        gradeId: gradeId.value,
+        unit: unit.value
+    });
+}, { immediate: true });
 const levels = computed(() => {
     if (!subjectId.value || !gradeId.value) {
         return [];

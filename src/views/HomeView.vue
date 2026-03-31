@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { SUBJECT_META } from '@/data/books';
+import { trackEvent } from '@/domain/analytics';
 import { getSubjectTotalLevels } from '@/domain/game';
 import { getSubjectCompletedCount } from '@/domain/progress';
 import { useProgressStore } from '@/stores/progress';
@@ -26,10 +27,15 @@ const subjectCards = computed(() => {
 });
 
 function openSubject(subjectId: SubjectId) {
+  trackEvent('subject_enter', { subjectId });
   const nextGrade =
     progressStore.progress.currentSubject === subjectId ? progressStore.progress.currentGrade : '一年级上册';
   progressStore.setCurrentPosition(subjectId, nextGrade, 1, 1);
   router.push(`/grade/${subjectId}`);
+}
+
+function openAdmin() {
+  router.push('/admin/login');
 }
 </script>
 
@@ -67,6 +73,7 @@ function openSubject(subjectId: SubjectId) {
     <footer class="footer-note">
       <p>每日15分钟，三科同步巩固</p>
       <p>纯本地学习，无广告，不收集信息</p>
+      <button class="btn admin-entry-btn" @click="openAdmin">进入管理后台</button>
     </footer>
   </main>
 </template>

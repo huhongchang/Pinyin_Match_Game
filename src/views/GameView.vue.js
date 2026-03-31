@@ -1,5 +1,6 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { trackEvent } from '@/domain/analytics';
 import { createTiles, formatMMSS, getGlobalLevelNumber, getLevelWords, getSubjectMeta, getUnitLevelCount, isValidGrade, isValidSubject } from '@/domain/game';
 import { isLevelUnlocked } from '@/domain/progress';
 import { useProgressStore } from '@/stores/progress';
@@ -103,6 +104,12 @@ function resetGame() {
     finished.value = false;
     hintActive.value = false;
     progressStore.setCurrentPosition(subjectId.value, gradeId.value, unit.value, level.value);
+    trackEvent('game_start', {
+        subjectId: subjectId.value,
+        gradeId: gradeId.value,
+        unit: unit.value,
+        level: level.value
+    });
     startTimer();
 }
 function ensureAudio() {
@@ -144,6 +151,14 @@ function finishLevel() {
     }
     finished.value = true;
     clearTimer();
+    trackEvent('game_complete', {
+        subjectId: subjectId.value,
+        gradeId: gradeId.value,
+        unit: unit.value,
+        level: level.value,
+        duration: elapsed.value,
+        errorCount: errors.value
+    });
     progressStore.completeLevel(subjectId.value, gradeId.value, unit.value, level.value, errors.value, elapsed.value);
     window.setTimeout(() => {
         router.push(`/victory/${subjectId.value}/${gradeId.value}/${unit.value}/${level.value}`);
@@ -159,6 +174,12 @@ function resolveSelection() {
     const second = tiles.value[secondIndex];
     const matched = first.pairId === second.pairId && first.type !== second.type;
     if (matched) {
+        trackEvent('game_match_success', {
+            subjectId: subjectId.value ?? undefined,
+            gradeId: gradeId.value ?? undefined,
+            unit: unit.value,
+            level: level.value
+        });
         playTone('match');
         window.setTimeout(() => {
             first.selected = false;
@@ -174,6 +195,12 @@ function resolveSelection() {
         }, 500);
         return;
     }
+    trackEvent('game_match_fail', {
+        subjectId: subjectId.value ?? undefined,
+        gradeId: gradeId.value ?? undefined,
+        unit: unit.value,
+        level: level.value
+    });
     playTone('error');
     errors.value += 1;
     first.mismatch = true;
@@ -214,6 +241,12 @@ function useHint() {
     if (!pair) {
         return;
     }
+    trackEvent('game_hint_use', {
+        subjectId: subjectId.value ?? undefined,
+        gradeId: gradeId.value ?? undefined,
+        unit: unit.value,
+        level: level.value
+    });
     resolving.value = true;
     hintActive.value = true;
     errors.value += 1;

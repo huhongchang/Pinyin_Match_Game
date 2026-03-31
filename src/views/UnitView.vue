@@ -2,6 +2,7 @@
 import { computed, watchEffect } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { GRADE_META } from '@/data/books';
+import { trackEvent } from '@/domain/analytics';
 import { getSubjectMeta, isValidGrade, isValidSubject } from '@/domain/game';
 import { isUnitCompleted, isUnitLocked } from '@/domain/progress';
 import { useProgressStore } from '@/stores/progress';
@@ -49,6 +50,13 @@ function openUnit(unit: number) {
   if (isUnitLocked(progressStore.progress, subjectId.value, gradeId.value, unit)) {
     return;
   }
+
+  trackEvent('unit_enter', {
+    subjectId: subjectId.value,
+    gradeId: gradeId.value,
+    unit
+  });
+
   router.push(`/level/${subjectId.value}/${gradeId.value}/${unit}`);
 }
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { trackEvent } from '@/domain/analytics';
 import {
   createTiles,
   formatMMSS,
@@ -132,6 +133,12 @@ function resetGame() {
   finished.value = false;
   hintActive.value = false;
   progressStore.setCurrentPosition(subjectId.value, gradeId.value, unit.value, level.value);
+  trackEvent('game_start', {
+    subjectId: subjectId.value,
+    gradeId: gradeId.value,
+    unit: unit.value,
+    level: level.value
+  });
   startTimer();
 }
 
@@ -180,6 +187,16 @@ function finishLevel() {
 
   finished.value = true;
   clearTimer();
+
+  trackEvent('game_complete', {
+    subjectId: subjectId.value,
+    gradeId: gradeId.value,
+    unit: unit.value,
+    level: level.value,
+    duration: elapsed.value,
+    errorCount: errors.value
+  });
+
   progressStore.completeLevel(subjectId.value, gradeId.value, unit.value, level.value, errors.value, elapsed.value);
 
   window.setTimeout(() => {
@@ -200,6 +217,13 @@ function resolveSelection() {
   const matched = first.pairId === second.pairId && first.type !== second.type;
 
   if (matched) {
+    trackEvent('game_match_success', {
+      subjectId: subjectId.value ?? undefined,
+      gradeId: gradeId.value ?? undefined,
+      unit: unit.value,
+      level: level.value
+    });
+
     playTone('match');
     window.setTimeout(() => {
       first.selected = false;
@@ -216,6 +240,13 @@ function resolveSelection() {
     }, 500);
     return;
   }
+
+  trackEvent('game_match_fail', {
+    subjectId: subjectId.value ?? undefined,
+    gradeId: gradeId.value ?? undefined,
+    unit: unit.value,
+    level: level.value
+  });
 
   playTone('error');
   errors.value += 1;
@@ -265,6 +296,13 @@ function useHint() {
   if (!pair) {
     return;
   }
+
+  trackEvent('game_hint_use', {
+    subjectId: subjectId.value ?? undefined,
+    gradeId: gradeId.value ?? undefined,
+    unit: unit.value,
+    level: level.value
+  });
 
   resolving.value = true;
   hintActive.value = true;
