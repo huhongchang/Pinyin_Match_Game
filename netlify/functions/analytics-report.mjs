@@ -53,6 +53,14 @@ function parseRange(query = {}) {
   };
 }
 
+function parseLimit(query = {}) {
+  const parsed = Number.parseInt(String(query.limit ?? '3000'), 10);
+  if (Number.isNaN(parsed)) {
+    return 3000;
+  }
+  return Math.max(100, Math.min(10000, parsed));
+}
+
 export async function handler(event) {
   if (event.httpMethod === 'OPTIONS') {
     return {
@@ -69,11 +77,15 @@ export async function handler(event) {
     return json(405, { message: 'Method Not Allowed' }, event);
   }
 
-  const { startAt, endAt } = parseRange(event.queryStringParameters ?? {});
-  const events = await listEventsByRange(startAt, endAt);
+  const query = event.queryStringParameters ?? {};
+  const { startAt, endAt } = parseRange(query);
+  const limit = parseLimit(query);
+  const events = await listEventsByRange(startAt, endAt, limit);
 
   return json(200, {
     range: { startAt, endAt },
+    limit,
+    truncated: events.length >= limit,
     count: events.length,
     events
   }, event);

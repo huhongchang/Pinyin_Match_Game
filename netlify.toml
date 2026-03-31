@@ -12,8 +12,10 @@
   from = "/api/analytics/ingest"
   to = "/.netlify/functions/analytics-ingest"
   status = 200
+  force = true
 
 [[redirects]]
   from = "/api/analytics/report"
   to = "/.netlify/functions/analytics-report"
   status = 200
+  force = true

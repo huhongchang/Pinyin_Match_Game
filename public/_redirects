@@ -1,1 +1,3 @@
+/api/analytics/ingest /.netlify/functions/analytics-ingest 200!
+/api/analytics/report /.netlify/functions/analytics-report 200!
 /* /index.html 200

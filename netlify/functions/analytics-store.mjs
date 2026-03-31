@@ -56,6 +56,24 @@ function normalizeTimestamp(value) {
   return Math.floor(parsed);
 }
 
+async function mapWithConcurrency(items, limit, mapper) {
+  const results = [];
+  let index = 0;
+
+  async function worker() {
+    while (index < items.length) {
+      const current = index;
+      index += 1;
+      const value = await mapper(items[current]);
+      results.push(value);
+    }
+  }
+
+  const workerCount = Math.max(1, Math.min(limit, items.length));
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  return results;
+}
+
 export function toUtcDateKey(timestamp) {
   return new Date(timestamp).toISOString().slice(0, 10);
 }
@@ -122,8 +140,9 @@ export function sanitizeEvent(input) {
   return event;
 }
 
-export async function listEventsByRange(startAt, endAt) {
+export async function listEventsByRange(startAt, endAt, maxEvents = 3000) {
   const results = [];
+  const safeLimit = Number.isFinite(Number(maxEvents)) ? Math.max(100, Math.min(10000, Number(maxEvents))) : 3000;
 
   let cursorDate = new Date(startAt);
   cursorDate.setHours(0, 0, 0, 0);
@@ -140,29 +159,51 @@ export async function listEventsByRange(startAt, endAt) {
       const page = await analyticsStore.list({ prefix, cursor });
       const blobs = Array.isArray(page?.blobs) ? page.blobs : [];
 
-      for (const blob of blobs) {
-        const key = typeof blob === 'string' ? blob : blob?.key;
-        if (!key) {
-          continue;
-        }
+      const keys = blobs
+        .map((blob) => (typeof blob === 'string' ? blob : blob?.key))
+        .filter(Boolean);
 
+      const parsedRows = await mapWithConcurrency(keys, 25, async (key) => {
         const content = await analyticsStore.get(key);
         if (!content) {
-          continue;
+          return null;
         }
 
         try {
           const parsed = JSON.parse(content);
-          if (parsed && typeof parsed === 'object' && Number(parsed.timestamp) >= startAt && Number(parsed.timestamp) <= endAt) {
-            results.push(parsed);
+          if (parsed && typeof parsed === 'object') {
+            const timestamp = Number(parsed.timestamp);
+            if (timestamp >= startAt && timestamp <= endAt) {
+              return parsed;
+            }
           }
         } catch {
           // ignore invalid blob
         }
+
+        return null;
+      });
+
+      for (const row of parsedRows) {
+        if (!row) {
+          continue;
+        }
+        results.push(row);
+        if (results.length >= safeLimit) {
+          break;
+        }
+      }
+
+      if (results.length >= safeLimit) {
+        break;
       }
 
       cursor = page?.cursor;
     } while (cursor);
+
+    if (results.length >= safeLimit) {
+      break;
+    }
 
     cursorDate = new Date(cursorDate.getTime() + 24 * 60 * 60 * 1000);
   }
