@@ -4,8 +4,58 @@ const DEVICE_KEY = 'usage_device_id_v1';
 const SESSION_KEY = 'usage_session_v1';
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
 const MAX_EVENTS = 6000;
+const ANALYTICS_INGEST_API = '/api/analytics/ingest';
+const ANALYTICS_REPORT_API = '/api/analytics/report';
+const REMOTE_BATCH_SIZE = 20;
+let pendingRemoteQueue = [];
+let flushTimer = null;
+let remoteFlushing = false;
 function createId() {
     return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 11)}`;
+}
+function parsePositiveInt(value) {
+    const parsed = Number.parseInt(String(value ?? ''), 10);
+    if (Number.isNaN(parsed) || parsed <= 0) {
+        return undefined;
+    }
+    return parsed;
+}
+function parseFloatNumber(value) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+        return undefined;
+    }
+    return parsed;
+}
+function normalizeRemoteEvent(item) {
+    if (!item || typeof item !== 'object') {
+        return null;
+    }
+    const raw = item;
+    if (typeof raw.id !== 'string' || typeof raw.name !== 'string' || typeof raw.sessionId !== 'string' || typeof raw.deviceId !== 'string') {
+        return null;
+    }
+    const timestamp = parsePositiveInt(raw.timestamp);
+    if (!timestamp) {
+        return null;
+    }
+    const event = {
+        id: raw.id,
+        name: raw.name,
+        timestamp,
+        sessionId: raw.sessionId,
+        deviceId: raw.deviceId,
+        path: typeof raw.path === 'string' ? raw.path : undefined,
+        routeName: typeof raw.routeName === 'string' ? raw.routeName : undefined,
+        pageName: typeof raw.pageName === 'string' ? raw.pageName : undefined,
+        subjectId: typeof raw.subjectId === 'string' && isValidSubject(raw.subjectId) ? raw.subjectId : undefined,
+        gradeId: typeof raw.gradeId === 'string' && isValidGrade(raw.gradeId) ? raw.gradeId : undefined,
+        unit: parsePositiveInt(raw.unit),
+        level: parsePositiveInt(raw.level),
+        duration: parsePositiveInt(raw.duration),
+        errorCount: parseFloatNumber(raw.errorCount)
+    };
+    return event;
 }
 function parseEvents(raw) {
     if (!raw) {
@@ -26,6 +76,58 @@ function parseEvents(raw) {
 }
 function saveEvents(events) {
     localStorage.setItem(EVENTS_KEY, JSON.stringify(events.slice(-MAX_EVENTS)));
+}
+async function flushRemoteQueue() {
+    if (remoteFlushing || pendingRemoteQueue.length === 0) {
+        return;
+    }
+    remoteFlushing = true;
+    try {
+        while (pendingRemoteQueue.length > 0) {
+            const batch = pendingRemoteQueue.slice(0, REMOTE_BATCH_SIZE);
+            const response = await fetch(ANALYTICS_INGEST_API, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ events: batch }),
+                keepalive: true
+            });
+            if (!response.ok) {
+                break;
+            }
+            pendingRemoteQueue = pendingRemoteQueue.slice(batch.length);
+        }
+    }
+    catch {
+        // network errors are tolerated, queue keeps pending
+    }
+    finally {
+        remoteFlushing = false;
+    }
+}
+function scheduleRemoteFlush() {
+    if (pendingRemoteQueue.length === 0) {
+        return;
+    }
+    if (pendingRemoteQueue.length >= REMOTE_BATCH_SIZE) {
+        void flushRemoteQueue();
+        return;
+    }
+    if (flushTimer !== null) {
+        return;
+    }
+    flushTimer = window.setTimeout(() => {
+        flushTimer = null;
+        void flushRemoteQueue();
+    }, 1000);
+}
+function enqueueRemoteEvent(event) {
+    pendingRemoteQueue.push(event);
+    if (pendingRemoteQueue.length > 2000) {
+        pendingRemoteQueue = pendingRemoteQueue.slice(-1000);
+    }
+    scheduleRemoteFlush();
 }
 function normalizeContext(payload) {
     const context = { ...payload };
@@ -141,6 +243,7 @@ export function trackEvent(name, payload = {}) {
     const events = getAnalyticsEvents();
     events.push(event);
     saveEvents(events);
+    enqueueRemoteEvent(event);
 }
 export function trackPageView(path, routeName, payload = {}) {
     const pathContext = parseContextFromPath(path);
@@ -153,6 +256,27 @@ export function trackPageView(path, routeName, payload = {}) {
 }
 export function getAnalyticsEvents() {
     return parseEvents(localStorage.getItem(EVENTS_KEY));
+}
+export async function fetchRemoteAnalyticsEvents(range) {
+    const params = new URLSearchParams({
+        startAt: String(range.startAt),
+        endAt: String(range.endAt)
+    });
+    const response = await fetch(`${ANALYTICS_REPORT_API}?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+            Accept: 'application/json'
+        }
+    });
+    if (!response.ok) {
+        throw new Error(`Fetch analytics failed: ${response.status}`);
+    }
+    const data = (await response.json());
+    const source = Array.isArray(data.events) ? data.events : [];
+    return source
+        .map((item) => normalizeRemoteEvent(item))
+        .filter((event) => event !== null)
+        .sort((a, b) => a.timestamp - b.timestamp);
 }
 export function escapeCsvValue(value) {
     if (/[,"\n]/.test(value)) {

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { GRADE_META, SUBJECT_META } from '@/data/books';
 import { logoutAdmin } from '@/domain/adminAuth';
-import { exportEventsAsCsv } from '@/domain/analytics';
+import { exportEventsAsCsv, fetchRemoteAnalyticsEvents, getAnalyticsEvents, type AnalyticsEvent } from '@/domain/analytics';
 import { createDashboardReport, resolveDateRange, type DatePreset } from '@/domain/adminStats';
 import type { GradeId, SubjectId } from '@/types';
 
@@ -19,18 +19,22 @@ const unitFilter = ref('');
 const levelFilter = ref('');
 
 const refreshTick = ref(0);
+const allEvents = ref<AnalyticsEvent[]>([]);
+const loading = ref(false);
+const dataSource = ref<'remote' | 'local'>('remote');
+const loadError = ref('');
 
 const dateRange = computed(() => resolveDateRange(datePreset.value, customStart.value, customEnd.value));
 
-const report = computed(() => {
-  refreshTick.value;
+const dashboardFilters = computed(() => ({
+  subjectId: subjectFilter.value === 'all' ? null : subjectFilter.value,
+  gradeId: gradeFilter.value === 'all' ? null : gradeFilter.value,
+  unit: unitFilter.value ? Number.parseInt(unitFilter.value, 10) : null,
+  level: levelFilter.value ? Number.parseInt(levelFilter.value, 10) : null
+}));
 
-  return createDashboardReport(dateRange.value, {
-    subjectId: subjectFilter.value === 'all' ? null : subjectFilter.value,
-    gradeId: gradeFilter.value === 'all' ? null : gradeFilter.value,
-    unit: unitFilter.value ? Number.parseInt(unitFilter.value, 10) : null,
-    level: levelFilter.value ? Number.parseInt(levelFilter.value, 10) : null
-  });
+const report = computed(() => {
+  return createDashboardReport(allEvents.value, dateRange.value, dashboardFilters.value);
 });
 
 const maxTrendValue = computed(() => {
@@ -52,6 +56,32 @@ function formatDuration(seconds: number): string {
 function refreshReport() {
   refreshTick.value += 1;
 }
+
+async function loadReportEvents() {
+  loading.value = true;
+  loadError.value = '';
+
+  try {
+    const remote = await fetchRemoteAnalyticsEvents(dateRange.value);
+    allEvents.value = remote;
+    dataSource.value = 'remote';
+  } catch {
+    const local = getAnalyticsEvents();
+    allEvents.value = local;
+    dataSource.value = 'local';
+    loadError.value = '服务端数据拉取失败，已回退到本机数据。';
+  } finally {
+    loading.value = false;
+  }
+}
+
+watch(
+  () => [dateRange.value.startAt, dateRange.value.endAt, refreshTick.value],
+  () => {
+    void loadReportEvents();
+  },
+  { immediate: true }
+);
 
 function exportCsv() {
   const csv = exportEventsAsCsv(report.value.filteredEvents);
@@ -78,6 +108,11 @@ function logout() {
         <p>
           统计区间：{{ new Date(dateRange.startAt).toLocaleString() }} -
           {{ new Date(dateRange.endAt).toLocaleString() }}
+        </p>
+        <p class="admin-status" v-if="loading">数据加载中...</p>
+        <p class="admin-status admin-status-warning" v-else-if="loadError">{{ loadError }}</p>
+        <p class="admin-status" v-else>
+          数据来源：{{ dataSource === 'remote' ? '服务端汇总' : '本机缓存' }}
         </p>
       </div>
       <div class="admin-header-actions">

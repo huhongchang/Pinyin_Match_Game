@@ -1,5 +1,5 @@
 import { SUBJECT_META } from '@/data/books';
-import { getAnalyticsEvents, type AnalyticsEvent } from '@/domain/analytics';
+import type { AnalyticsEvent } from '@/domain/analytics';
 import type { GradeId, SubjectId } from '@/types';
 
 export type DatePreset = 'today' | '7d' | '30d' | 'custom';
@@ -397,8 +397,7 @@ function buildDailyTrend(events: AnalyticsEvent[], range: DateRange): TrendPoint
   }));
 }
 
-export function createDashboardReport(range: DateRange, filters: DashboardFilters): DashboardReport {
-  const allEvents = getAnalyticsEvents();
+export function createDashboardReport(allEvents: AnalyticsEvent[], range: DateRange, filters: DashboardFilters): DashboardReport {
 
   const rangedEvents = allEvents.filter((event) => event.timestamp >= range.startAt && event.timestamp <= range.endAt);
   const filteredEvents = rangedEvents.filter((event) => matchDimensionFilters(event, filters));

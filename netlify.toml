@@ -7,3 +7,13 @@
 
 [context.production]
   branch = "main"
+
+[[redirects]]
+  from = "/api/analytics/ingest"
+  to = "/.netlify/functions/analytics-ingest"
+  status = 200
+
+[[redirects]]
+  from = "/api/analytics/report"
+  to = "/.netlify/functions/analytics-report"
+  status = 200

@@ -1,8 +1,8 @@
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { GRADE_META, SUBJECT_META } from '@/data/books';
 import { logoutAdmin } from '@/domain/adminAuth';
-import { exportEventsAsCsv } from '@/domain/analytics';
+import { exportEventsAsCsv, fetchRemoteAnalyticsEvents, getAnalyticsEvents } from '@/domain/analytics';
 import { createDashboardReport, resolveDateRange } from '@/domain/adminStats';
 const router = useRouter();
 const datePreset = ref('7d');
@@ -13,15 +13,19 @@ const gradeFilter = ref('all');
 const unitFilter = ref('');
 const levelFilter = ref('');
 const refreshTick = ref(0);
+const allEvents = ref([]);
+const loading = ref(false);
+const dataSource = ref('remote');
+const loadError = ref('');
 const dateRange = computed(() => resolveDateRange(datePreset.value, customStart.value, customEnd.value));
+const dashboardFilters = computed(() => ({
+    subjectId: subjectFilter.value === 'all' ? null : subjectFilter.value,
+    gradeId: gradeFilter.value === 'all' ? null : gradeFilter.value,
+    unit: unitFilter.value ? Number.parseInt(unitFilter.value, 10) : null,
+    level: levelFilter.value ? Number.parseInt(levelFilter.value, 10) : null
+}));
 const report = computed(() => {
-    refreshTick.value;
-    return createDashboardReport(dateRange.value, {
-        subjectId: subjectFilter.value === 'all' ? null : subjectFilter.value,
-        gradeId: gradeFilter.value === 'all' ? null : gradeFilter.value,
-        unit: unitFilter.value ? Number.parseInt(unitFilter.value, 10) : null,
-        level: levelFilter.value ? Number.parseInt(levelFilter.value, 10) : null
-    });
+    return createDashboardReport(allEvents.value, dateRange.value, dashboardFilters.value);
 });
 const maxTrendValue = computed(() => {
     const values = report.value.dailyTrend.flatMap((point) => [point.activeDevices, point.gameStarts, point.gameCompletions]);
@@ -39,6 +43,27 @@ function formatDuration(seconds) {
 function refreshReport() {
     refreshTick.value += 1;
 }
+async function loadReportEvents() {
+    loading.value = true;
+    loadError.value = '';
+    try {
+        const remote = await fetchRemoteAnalyticsEvents(dateRange.value);
+        allEvents.value = remote;
+        dataSource.value = 'remote';
+    }
+    catch {
+        const local = getAnalyticsEvents();
+        allEvents.value = local;
+        dataSource.value = 'local';
+        loadError.value = '服务端数据拉取失败，已回退到本机数据。';
+    }
+    finally {
+        loading.value = false;
+    }
+}
+watch(() => [dateRange.value.startAt, dateRange.value.endAt, refreshTick.value], () => {
+    void loadReportEvents();
+}, { immediate: true });
 function exportCsv() {
     const csv = exportEventsAsCsv(report.value.filteredEvents);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -74,6 +99,27 @@ __VLS_asFunctionalElement1(__VLS_intrinsics.h1, __VLS_intrinsics.h1)({});
 __VLS_asFunctionalElement1(__VLS_intrinsics.p, __VLS_intrinsics.p)({});
 (new Date(__VLS_ctx.dateRange.startAt).toLocaleString());
 (new Date(__VLS_ctx.dateRange.endAt).toLocaleString());
+if (__VLS_ctx.loading) {
+    __VLS_asFunctionalElement1(__VLS_intrinsics.p, __VLS_intrinsics.p)({
+        ...{ class: "admin-status" },
+    });
+    /** @type {__VLS_StyleScopedClasses['admin-status']} */ ;
+}
+else if (__VLS_ctx.loadError) {
+    __VLS_asFunctionalElement1(__VLS_intrinsics.p, __VLS_intrinsics.p)({
+        ...{ class: "admin-status admin-status-warning" },
+    });
+    /** @type {__VLS_StyleScopedClasses['admin-status']} */ ;
+    /** @type {__VLS_StyleScopedClasses['admin-status-warning']} */ ;
+    (__VLS_ctx.loadError);
+}
+else {
+    __VLS_asFunctionalElement1(__VLS_intrinsics.p, __VLS_intrinsics.p)({
+        ...{ class: "admin-status" },
+    });
+    /** @type {__VLS_StyleScopedClasses['admin-status']} */ ;
+    (__VLS_ctx.dataSource === 'remote' ? '服务端汇总' : '本机缓存');
+}
 __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
     ...{ class: "admin-header-actions" },
 });
@@ -145,7 +191,7 @@ for (const [subject] of __VLS_vFor((__VLS_ctx.SUBJECT_META))) {
     });
     (subject.name);
     // @ts-ignore
-    [dateRange, dateRange, refreshReport, exportCsv, logout, datePreset, datePreset, datePreset, customStart, customEnd, subjectFilter, SUBJECT_META,];
+    [dateRange, dateRange, loading, loadError, loadError, dataSource, refreshReport, exportCsv, logout, datePreset, datePreset, datePreset, customStart, customEnd, subjectFilter, SUBJECT_META,];
 }
 __VLS_asFunctionalElement1(__VLS_intrinsics.label, __VLS_intrinsics.label)({});
 __VLS_asFunctionalElement1(__VLS_intrinsics.span, __VLS_intrinsics.span)({});

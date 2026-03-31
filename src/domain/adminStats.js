@@ -1,5 +1,4 @@
 import { SUBJECT_META } from '@/data/books';
-import { getAnalyticsEvents } from '@/domain/analytics';
 function getDayStart(ts) {
     const date = new Date(ts);
     date.setHours(0, 0, 0, 0);
@@ -252,8 +251,7 @@ function buildDailyTrend(events, range) {
         gameCompletions: bucket.completes
     }));
 }
-export function createDashboardReport(range, filters) {
-    const allEvents = getAnalyticsEvents();
+export function createDashboardReport(allEvents, range, filters) {
     const rangedEvents = allEvents.filter((event) => event.timestamp >= range.startAt && event.timestamp <= range.endAt);
     const filteredEvents = rangedEvents.filter((event) => matchDimensionFilters(event, filters));
     const sessionMap = buildSessionMap(filteredEvents);
