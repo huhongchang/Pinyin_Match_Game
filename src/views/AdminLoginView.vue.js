@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { DEFAULT_ADMIN_PASSWORD, DEFAULT_ADMIN_USERNAME, loginAdmin } from '@/domain/adminAuth';
+import { ADMIN_DASHBOARD_PATH } from '@/domain/adminRoutes';
 const route = useRoute();
 const router = useRouter();
 const username = ref('');
@@ -9,7 +10,7 @@ const errorText = ref('');
 const submitting = ref(false);
 const redirectPath = computed(() => {
     const redirect = route.query.redirect;
-    return typeof redirect === 'string' && redirect.startsWith('/') ? redirect : '/admin';
+    return typeof redirect === 'string' && redirect.startsWith('/') ? redirect : ADMIN_DASHBOARD_PATH;
 });
 function submitLogin() {
     if (submitting.value) {

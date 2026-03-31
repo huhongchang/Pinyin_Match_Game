@@ -26,9 +26,6 @@ function openSubject(subjectId) {
     progressStore.setCurrentPosition(subjectId, nextGrade, 1, 1);
     router.push(`/grade/${subjectId}`);
 }
-function openAdmin() {
-    router.push('/admin/login');
-}
 const __VLS_ctx = {
     ...{},
     ...{},
@@ -119,13 +116,7 @@ __VLS_asFunctionalElement1(__VLS_intrinsics.footer, __VLS_intrinsics.footer)({
 /** @type {__VLS_StyleScopedClasses['footer-note']} */ ;
 __VLS_asFunctionalElement1(__VLS_intrinsics.p, __VLS_intrinsics.p)({});
 __VLS_asFunctionalElement1(__VLS_intrinsics.p, __VLS_intrinsics.p)({});
-__VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
-    ...{ onClick: (__VLS_ctx.openAdmin) },
-    ...{ class: "btn admin-entry-btn" },
-});
-/** @type {__VLS_StyleScopedClasses['btn']} */ ;
-/** @type {__VLS_StyleScopedClasses['admin-entry-btn']} */ ;
 // @ts-ignore
-[openAdmin,];
+[];
 const __VLS_export = (await import('vue')).defineComponent({});
 export default {};

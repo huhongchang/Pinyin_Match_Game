@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { GRADE_META, SUBJECT_META } from '@/data/books';
 import { logoutAdmin } from '@/domain/adminAuth';
+import { ADMIN_LOGIN_PATH } from '@/domain/adminRoutes';
 import { exportEventsAsCsv, fetchRemoteAnalyticsEvents, getAnalyticsEvents, type AnalyticsEvent } from '@/domain/analytics';
 import { createDashboardReport, resolveDateRange, type DatePreset } from '@/domain/adminStats';
 import type { GradeId, SubjectId } from '@/types';
@@ -65,11 +66,12 @@ async function loadReportEvents() {
     const remote = await fetchRemoteAnalyticsEvents(dateRange.value);
     allEvents.value = remote;
     dataSource.value = 'remote';
-  } catch {
+  } catch (error) {
     const local = getAnalyticsEvents();
     allEvents.value = local;
     dataSource.value = 'local';
-    loadError.value = '服务端数据拉取失败，已回退到本机数据。';
+    const reason = error instanceof Error && error.message ? `（${error.message}）` : '';
+    loadError.value = `服务端数据拉取失败，已回退到本机数据。${reason}`;
   } finally {
     loading.value = false;
   }
@@ -96,7 +98,7 @@ function exportCsv() {
 
 function logout() {
   logoutAdmin();
-  router.replace('/admin/login');
+  router.replace(ADMIN_LOGIN_PATH);
 }
 </script>
 

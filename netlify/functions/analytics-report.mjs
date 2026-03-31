@@ -1,11 +1,22 @@
 import { listEventsByRange } from './analytics-store.mjs';
 
-function json(statusCode, body) {
+function corsHeaders(event) {
+  const origin = event?.headers?.origin || event?.headers?.Origin || '*';
+  return {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Accept',
+    Vary: 'Origin'
+  };
+}
+
+function json(statusCode, body, event) {
   return {
     statusCode,
     headers: {
       'Content-Type': 'application/json',
-      'Cache-Control': 'no-store'
+      'Cache-Control': 'no-store',
+      ...corsHeaders(event)
     },
     body: JSON.stringify(body)
   };
@@ -43,8 +54,19 @@ function parseRange(query = {}) {
 }
 
 export async function handler(event) {
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 204,
+      headers: {
+        Allow: 'GET, OPTIONS',
+        ...corsHeaders(event)
+      },
+      body: ''
+    };
+  }
+
   if (event.httpMethod !== 'GET') {
-    return json(405, { message: 'Method Not Allowed' });
+    return json(405, { message: 'Method Not Allowed' }, event);
   }
 
   const { startAt, endAt } = parseRange(event.queryStringParameters ?? {});
@@ -54,5 +76,5 @@ export async function handler(event) {
     range: { startAt, endAt },
     count: events.length,
     events
-  });
+  }, event);
 }

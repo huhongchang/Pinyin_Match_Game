@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { isAdminLoggedIn } from '@/domain/adminAuth';
 import { trackPageView } from '@/domain/analytics';
+import { ADMIN_DASHBOARD_PATH, ADMIN_LOGIN_PATH } from '@/domain/adminRoutes';
 import HomeView from '@/views/HomeView.vue';
 import GradeView from '@/views/GradeView.vue';
 import UnitView from '@/views/UnitView.vue';
@@ -22,13 +23,15 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', name: 'Home', component: HomeView },
-    { path: '/admin/login', name: 'AdminLogin', component: AdminLoginView },
+    { path: ADMIN_LOGIN_PATH, name: 'AdminLogin', component: AdminLoginView },
     {
-      path: '/admin',
+      path: ADMIN_DASHBOARD_PATH,
       name: 'AdminDashboard',
       component: AdminDashboardView,
       meta: { requiresAdmin: true }
     },
+    { path: '/admin/login', redirect: '/' },
+    { path: '/admin', redirect: '/' },
     { path: '/grade/:subject', name: 'Grade', component: GradeView },
     { path: '/unit/:subject/:grade', name: 'Unit', component: UnitView },
     { path: '/level/:subject/:grade/:unit', name: 'Level', component: LevelView },
@@ -55,12 +58,12 @@ const router = createRouter({
 
 router.beforeEach((to) => {
   if (to.name === 'AdminLogin' && isAdminLoggedIn()) {
-    return '/admin';
+    return ADMIN_DASHBOARD_PATH;
   }
 
   if (to.meta.requiresAdmin && !isAdminLoggedIn()) {
     return {
-      path: '/admin/login',
+      path: ADMIN_LOGIN_PATH,
       query: {
         redirect: to.fullPath
       }
@@ -71,7 +74,7 @@ router.beforeEach((to) => {
 });
 
 router.afterEach((to) => {
-  if (to.path.startsWith('/admin')) {
+  if (to.name === 'AdminLogin' || to.name === 'AdminDashboard') {
     return;
   }
 

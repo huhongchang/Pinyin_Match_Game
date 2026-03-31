@@ -33,10 +33,6 @@ function openSubject(subjectId: SubjectId) {
   progressStore.setCurrentPosition(subjectId, nextGrade, 1, 1);
   router.push(`/grade/${subjectId}`);
 }
-
-function openAdmin() {
-  router.push('/admin/login');
-}
 </script>
 
 <template>
@@ -73,7 +69,6 @@ function openAdmin() {
     <footer class="footer-note">
       <p>每日15分钟，三科同步巩固</p>
       <p>纯本地学习，无广告，不收集信息</p>
-      <button class="btn admin-entry-btn" @click="openAdmin">进入管理后台</button>
     </footer>
   </main>
 </template>

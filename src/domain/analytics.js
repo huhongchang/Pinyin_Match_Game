@@ -4,9 +4,13 @@ const DEVICE_KEY = 'usage_device_id_v1';
 const SESSION_KEY = 'usage_session_v1';
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
 const MAX_EVENTS = 6000;
-const ANALYTICS_INGEST_API = '/.netlify/functions/analytics-ingest';
-const ANALYTICS_REPORT_API = '/.netlify/functions/analytics-report';
+const ANALYTICS_INGEST_FUNCTION_PATH = '/.netlify/functions/analytics-ingest';
+const ANALYTICS_REPORT_FUNCTION_PATH = '/.netlify/functions/analytics-report';
+const ANALYTICS_INGEST_REDIRECT_PATH = '/api/analytics/ingest';
+const ANALYTICS_REPORT_REDIRECT_PATH = '/api/analytics/report';
+const DEV_DEFAULT_ANALYTICS_ORIGIN = 'https://hhc-subjectmatchgame.netlify.app';
 const REMOTE_BATCH_SIZE = 20;
+const REMOTE_REQUEST_TIMEOUT_MS = 7000;
 let pendingRemoteQueue = [];
 let flushTimer = null;
 let remoteFlushing = false;
@@ -77,6 +81,71 @@ function parseEvents(raw) {
 function saveEvents(events) {
     localStorage.setItem(EVENTS_KEY, JSON.stringify(events.slice(-MAX_EVENTS)));
 }
+function normalizeOrigin(origin) {
+    return origin.trim().replace(/\/+$/, '');
+}
+function resolveRemoteAnalyticsOrigin() {
+    const configured = String(import.meta.env.VITE_ANALYTICS_REMOTE_ORIGIN ?? '').trim();
+    if (configured) {
+        return normalizeOrigin(configured);
+    }
+    if (typeof window === 'undefined') {
+        return null;
+    }
+    const currentOrigin = window.location.origin;
+    const isLocalRuntime = currentOrigin.includes('localhost') || currentOrigin.includes('127.0.0.1');
+    if (isLocalRuntime) {
+        return DEV_DEFAULT_ANALYTICS_ORIGIN;
+    }
+    return null;
+}
+function buildApiCandidates(functionPath, redirectPath) {
+    const candidates = [functionPath, redirectPath];
+    const remoteOrigin = resolveRemoteAnalyticsOrigin();
+    if (remoteOrigin && (typeof window === 'undefined' || normalizeOrigin(window.location.origin) !== remoteOrigin)) {
+        candidates.push(`${remoteOrigin}${functionPath}`);
+        candidates.push(`${remoteOrigin}${redirectPath}`);
+    }
+    return Array.from(new Set(candidates));
+}
+async function fetchWithTimeout(input, init) {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+        controller.abort();
+    }, REMOTE_REQUEST_TIMEOUT_MS);
+    try {
+        return await fetch(input, {
+            ...init,
+            signal: controller.signal
+        });
+    }
+    finally {
+        window.clearTimeout(timer);
+    }
+}
+async function postEventsBatch(batch) {
+    const endpoints = buildApiCandidates(ANALYTICS_INGEST_FUNCTION_PATH, ANALYTICS_INGEST_REDIRECT_PATH);
+    for (const endpoint of endpoints) {
+        try {
+            const response = await fetchWithTimeout(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json'
+                },
+                body: JSON.stringify({ events: batch }),
+                keepalive: true
+            });
+            if (response.ok) {
+                return true;
+            }
+        }
+        catch {
+            // try next endpoint
+        }
+    }
+    return false;
+}
 async function flushRemoteQueue() {
     if (remoteFlushing || pendingRemoteQueue.length === 0) {
         return;
@@ -85,15 +154,8 @@ async function flushRemoteQueue() {
     try {
         while (pendingRemoteQueue.length > 0) {
             const batch = pendingRemoteQueue.slice(0, REMOTE_BATCH_SIZE);
-            const response = await fetch(ANALYTICS_INGEST_API, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ events: batch }),
-                keepalive: true
-            });
-            if (!response.ok) {
+            const posted = await postEventsBatch(batch);
+            if (!posted) {
                 break;
             }
             pendingRemoteQueue = pendingRemoteQueue.slice(batch.length);
@@ -262,21 +324,32 @@ export async function fetchRemoteAnalyticsEvents(range) {
         startAt: String(range.startAt),
         endAt: String(range.endAt)
     });
-    const response = await fetch(`${ANALYTICS_REPORT_API}?${params.toString()}`, {
-        method: 'GET',
-        headers: {
-            Accept: 'application/json'
+    const endpoints = buildApiCandidates(ANALYTICS_REPORT_FUNCTION_PATH, ANALYTICS_REPORT_REDIRECT_PATH);
+    let latestError = null;
+    for (const endpoint of endpoints) {
+        try {
+            const response = await fetchWithTimeout(`${endpoint}?${params.toString()}`, {
+                method: 'GET',
+                headers: {
+                    Accept: 'application/json'
+                }
+            });
+            if (!response.ok) {
+                latestError = new Error(`Fetch analytics failed: ${response.status} @ ${endpoint}`);
+                continue;
+            }
+            const data = (await response.json());
+            const source = Array.isArray(data.events) ? data.events : [];
+            return source
+                .map((item) => normalizeRemoteEvent(item))
+                .filter((event) => event !== null)
+                .sort((a, b) => a.timestamp - b.timestamp);
         }
-    });
-    if (!response.ok) {
-        throw new Error(`Fetch analytics failed: ${response.status}`);
+        catch (error) {
+            latestError = error;
+        }
     }
-    const data = (await response.json());
-    const source = Array.isArray(data.events) ? data.events : [];
-    return source
-        .map((item) => normalizeRemoteEvent(item))
-        .filter((event) => event !== null)
-        .sort((a, b) => a.timestamp - b.timestamp);
+    throw latestError instanceof Error ? latestError : new Error('Fetch analytics failed: all endpoints unavailable');
 }
 export function escapeCsvValue(value) {
     if (/[,"\n]/.test(value)) {
